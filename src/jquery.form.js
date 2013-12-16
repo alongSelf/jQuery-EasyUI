@@ -1,6 +1,6 @@
 /**
  * form - jQuery EasyUI
- *
+ * 
  * Copyright (c) 2009-2013 www.jeasyui.com. All rights reserved.
  *
  * Licensed under the GPL or commercial licenses
@@ -14,14 +14,14 @@
 	 */
 	function ajaxSubmit(target, options){
 		options = options || {};
-
+		
 		var param = {};
 		if (options.onSubmit){
 			if (options.onSubmit.call(target, param) == false) {
 				return;
 			}
 		}
-
+		
 		var form = $(target);
 		if (options.url){
 			form.attr('action', options.url);
@@ -36,7 +36,7 @@
 				});
 		var t = form.attr('target'), a = form.attr('action');
 		form.attr('target', frameId);
-
+		
 		var paramFields = $();
 		try {
 			frame.appendTo('body');
@@ -45,58 +45,69 @@
 				var f = $('<input type="hidden" name="' + n + '">').val(param[n]).appendTo(form);
 				paramFields = paramFields.add(f);
 			}
+			checkState();
 			form[0].submit();
 		} finally {
 			form.attr('action', a);
 			t ? form.attr('target', t) : form.removeAttr('target');
 			paramFields.remove();
 		}
-
+		
+		function checkState(){
+			var f = $('#'+frameId);
+			if (!f.length){return}
+			try{
+				var s = f.contents()[0].readyState;
+				if (s && s.toLowerCase() == 'uninitialized'){
+					setTimeout(checkState, 100);
+				}
+			} catch(e){
+				cb();
+			}
+		}
+		
 		var checkCount = 10;
 		function cb(){
+			var frame = $('#'+frameId);
+			if (!frame.length){return}
 			frame.unbind();
-			var body = $('#'+frameId).contents().find('body');
-			var data = body.html();
-			if (data == ''){
-				if (--checkCount){
-					setTimeout(cb, 100);
-					return;
+			var data = '';
+			try{
+				var body = frame.contents().find('body');
+				data = body.html();
+				if (data == ''){
+					if (--checkCount){
+						setTimeout(cb, 100);
+						return;
+					}
+//					return;
 				}
-				return;
-			}
-			var ta = body.find('>textarea');
-			if (ta.length){
-				data = ta.val();
-			} else {
-				var pre = body.find('>pre');
-				if (pre.length){
-					data = pre.html();
+				var ta = body.find('>textarea');
+				if (ta.length){
+					data = ta.val();
+				} else {
+					var pre = body.find('>pre');
+					if (pre.length){
+						data = pre.html();
+					}
 				}
+			} catch(e){
+				
 			}
 			if (options.success){
 				options.success(data);
 			}
-//			try{
-//				eval('data='+data);
-//				if (options.success){
-//					options.success(data);
-//				}
-//			} catch(e) {
-//				if (options.failure){
-//					options.failure(data);
-//				}
-//			}
 			setTimeout(function(){
 				frame.unbind();
 				frame.remove();
 			}, 100);
 		}
 	}
-
+	
 	/**
 	 * load form data
-	 * if data is a URL string type load from remote site,
-	 * otherwise load from local data object.
+	 * if data is a URL string type load from remote site, 
+	 * otherwise load from local data object. 
 	 */
 	function load(target, data){
 		if (!$.data(target, 'form')){
@@ -105,11 +116,11 @@
 			});
 		}
 		var opts = $.data(target, 'form').options;
-
+		
 		if (typeof data == 'string'){
 			var param = {};
 			if (opts.onBeforeLoad.call(target, param) == false) return;
-
+			
 			$.ajax({
 				url: data,
 				data: param,
@@ -124,18 +135,23 @@
 		} else {
 			_load(data);
 		}
-
+		
 		function _load(data){
-			opts.onBeforeRender.call(target, data);
 			var form = $(target);
 			for(var name in data){
 				var val = data[name];
 				var rr = _checkField(name, val);
 				if (!rr.length){
-					var f = form.find('input[numberboxName="'+name+'"]');
-					if (f.length){
-						f.numberbox('setValue', val);	// set numberbox value
-					} else {
+//					var f = form.find('input[numberboxName="'+name+'"]');
+//					if (f.length){
+//						f.numberbox('setValue', val);	// set numberbox value
+//					} else {
+//						$('input[name="'+name+'"]', form).val(val);
+//						$('textarea[name="'+name+'"]', form).val(val);
+//						$('select[name="'+name+'"]', form).val(val);
+//					}
+					var count = _loadOther(name, val);
+					if (!count){
 						$('input[name="'+name+'"]', form).val(val);
 						$('textarea[name="'+name+'"]', form).val(val);
 						$('select[name="'+name+'"]', form).val(val);
@@ -146,7 +162,7 @@
 			opts.onLoadSuccess.call(target, data);
 			validate(target);
 		}
-
+		
 		/**
 		 * check the checkbox and radio fields
 		 */
@@ -155,13 +171,27 @@
 			rr._propAttr('checked', false);
 			rr.each(function(){
 				var f = $(this);
-				if (f.val() == String(val) || $.inArray(f.val(), val) >= 0){
+				if (f.val() == String(val) || $.inArray(f.val(), $.isArray(val)?val:[val]) >= 0){
 					f._propAttr('checked', true);
 				}
 			});
 			return rr;
 		}
-
+		
+		function _loadOther(name, val){
+			var count = 0;
+			var pp = ['numberbox','slider'];
+			for(var i=0; i<pp.length; i++){
+				var p = pp[i];
+				var f = $(target).find('input['+p+'Name="'+name+'"]');
+				if (f.length){
+					f[p]('setValue', val);
+					count += f.length;
+				}
+			}
+			return count;
+		}
+		
 		function _loadCombo(name, val){
 			var form = $(target);
 			var cc = ['combobox','combotree','combogrid','datetimebox','datebox','combo'];
@@ -181,7 +211,7 @@
 			}
 		}
 	}
-
+	
 	/**
 	 * clear the form fields
 	 */
@@ -199,31 +229,50 @@
 			} else if (tag == 'select'){
 				this.selectedIndex = -1;
 			}
-
+			
 		});
-		if ($.fn.combo) $('.combo-f', target).combo('clear');
-		if ($.fn.combobox) $('.combobox-f', target).combobox('clear');
-		if ($.fn.combotree) $('.combotree-f', target).combotree('clear');
-		if ($.fn.combogrid) $('.combogrid-f', target).combogrid('clear');
+//		if ($.fn.combo) $('.combo-f', target).combo('clear');
+//		if ($.fn.combobox) $('.combobox-f', target).combobox('clear');
+//		if ($.fn.combotree) $('.combotree-f', target).combotree('clear');
+//		if ($.fn.combogrid) $('.combogrid-f', target).combogrid('clear');
+		
+		var t = $(target);
+		var plugins = ['combo','combobox','combotree','combogrid','slider'];
+		for(var i=0; i<plugins.length; i++){
+			var plugin = plugins[i];
+			var r = t.find('.'+plugin+'-f');
+			if (r.length && r[plugin]){
+				r[plugin]('clear');
+			}
+		}
 		validate(target);
 	}
-
+	
 	function reset(target){
 		target.reset();
 		var t = $(target);
-		if ($.fn.combo){t.find('.combo-f').combo('reset');}
-		if ($.fn.combobox){t.find('.combobox-f').combobox('reset');}
-		if ($.fn.combotree){t.find('.combotree-f').combotree('reset');}
-		if ($.fn.combogrid){t.find('.combogrid-f').combogrid('reset');}
-		if ($.fn.datebox){t.find('.datebox-f').datebox('reset');}
-		if ($.fn.datetimebox){t.find('.datetimebox-f').datetimebox('reset');}
-		if ($.fn.spinner){t.find('.spinner-f').spinner('reset');}
-		if ($.fn.timespinner){t.find('.timespinner-f').timespinner('reset');}
-		if ($.fn.numberbox){t.find('.numberbox-f').numberbox('reset');}
-		if ($.fn.numberspinner){t.find('.numberspinner-f').numberspinner('reset');}
+//		if ($.fn.combo){t.find('.combo-f').combo('reset');}
+//		if ($.fn.combobox){t.find('.combobox-f').combobox('reset');}
+//		if ($.fn.combotree){t.find('.combotree-f').combotree('reset');}
+//		if ($.fn.combogrid){t.find('.combogrid-f').combogrid('reset');}
+//		if ($.fn.datebox){t.find('.datebox-f').datebox('reset');}
+//		if ($.fn.datetimebox){t.find('.datetimebox-f').datetimebox('reset');}
+//		if ($.fn.spinner){t.find('.spinner-f').spinner('reset');}
+//		if ($.fn.timespinner){t.find('.timespinner-f').timespinner('reset');}
+//		if ($.fn.numberbox){t.find('.numberbox-f').numberbox('reset');}
+//		if ($.fn.numberspinner){t.find('.numberspinner-f').numberspinner('reset');}
+		
+		var plugins = ['combo','combobox','combotree','combogrid','datebox','datetimebox','spinner','timespinner','numberbox','numberspinner','slider'];
+		for(var i=0; i<plugins.length; i++){
+			var plugin = plugins[i];
+			var r = t.find('.'+plugin+'-f');
+			if (r.length && r[plugin]){
+				r[plugin]('reset');
+			}
+		}
 		validate(target);
 	}
-
+	
 	/**
 	 * set the form to make it can submit with ajax.
 	 */
@@ -237,7 +286,7 @@
 			return false;
 		});
 	}
-
+	
 //	function validate(target){
 //		if ($.fn.validatebox){
 //			var box = $('.validatebox-text', target);
@@ -261,16 +310,16 @@
 		}
 		return true;
 	}
-
+	
 	function setValidation(target, novalidate){
 		$(target).find('.validatebox-text:not(:disabled)').validatebox(novalidate ? 'disableValidation' : 'enableValidation');
 	}
-
+	
 	$.fn.form = function(options, param){
 		if (typeof options == 'string'){
 			return $.fn.form.methods[options](this, param);
 		}
-
+		
 		options = options || {};
 		return this.each(function(){
 			if (!$.data(this, 'form')){
@@ -281,7 +330,7 @@
 			setForm(this);
 		});
 	};
-
+	
 	$.fn.form.methods = {
 		submit: function(jq, options){
 			return jq.each(function(){
@@ -317,12 +366,11 @@
 			});
 		}
 	};
-
+	
 	$.fn.form.defaults = {
 		url: null,
 		onSubmit: function(param){return $(this).form('validate');},
 		success: function(data){},
-		onBeforeRender: function(data){},
 		onBeforeLoad: function(param){},
 		onLoadSuccess: function(data){},
 		onLoadError: function(){}
